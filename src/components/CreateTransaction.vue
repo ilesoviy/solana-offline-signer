@@ -3,6 +3,16 @@ import Button from './reusable/Button.vue';
 import FormInput from './reusable/FormInput.vue';
 import QrcodeVue from 'qrcode.vue';
 
+import 'core-js/stable';
+import 'regenerator-runtime/runtime';
+
+import * as web3 from '@solana/web3.js';
+
+import nacl from 'tweetnacl';
+import * as bip39 from 'bip39';
+import * as bs58 from "bs58";
+import { derivePath } from 'ed25519-hd-key';
+
 export default {
 	components: {
 		Button,
@@ -14,8 +24,8 @@ export default {
 			recentBlockhash: localStorage.getItem('RecentBlockhash') == undefined ? '' : localStorage.getItem('RecentBlockhash'),
 			destinationAddress: localStorage.getItem('DestinationAddress') == undefined ? '' : localStorage.getItem('DestinationAddress'),
 			amount: localStorage.getItem('Amount') == undefined ? '' : localStorage.getItem('Amount'),
-			mnemonic: '',
-			sourceAddress: '',
+			mnemonic: 'another claw veteran ancient early manual tip eternal horn stereo hole apple',
+			sourceAddress: null,
 			URLtoBroadcast: localStorage.getItem('EndPointUrl') == undefined ? '' : localStorage.getItem('EndPointUrl'),
 			IsCreated: false,
 			signedTx: '',
@@ -42,21 +52,63 @@ export default {
 
 			this.getSourceAddressFromMnemonic();
 		},
-		setSourceAddress(event) {
-			this.sourceAddress = event.target.value;
-		},
-		getSourceAddressFromMnemonic() {
+		async getSourceAddressFromMnemonic() {
 			// Add web3
-			this.sourceAddress = this.mnemonic;
+			const seed = bip39.mnemonicToSeedSync(this.mnemonic, "");
+			const path = `m/44'/501'/0'/0'`;
+			const keypair = web3.Keypair.fromSeed(derivePath(path, seed.toString("hex")).key);
+
+			this.sourceAddress = keypair;
 		},
-		createTransaction() {
+		async createTransaction() {
 			// Add web3
+			const feePayer = web3.Keypair.generate();
+
+			// 1. Create Transaction
+			let tx = new web3.Transaction().add(
+				web3.SystemProgram.transfer({
+					fromPubkey: this.sourceAddress.publicKey,
+					toPubkey: new web3.PublicKey(this.destinationAddress),
+					lamports: this.amount,
+				})
+			);
+			tx.recentBlockhash = this.recentBlockhash;
+			tx.feePayer = feePayer.publicKey;
+			let realDataNeedToSign = tx.serializeMessage(); // the real data singer need to sign.
+
+			// 2. Sign Transaction
+			let feePayerSignature = nacl.sign.detached(realDataNeedToSign, feePayer.secretKey);
+			let sourceSignature = nacl.sign.detached(realDataNeedToSign, this.sourceAddress.secretKey);
+
+			// 3. Recover Transaction
+			let verifyFeePayerSignatureResult = nacl.sign.detached.verify(
+				realDataNeedToSign,
+				feePayerSignature,
+				feePayer.publicKey.toBytes() // you should use the raw pubkey (32 bytes) to verify
+			);
+			console.log(`verify feePayer signature: ${verifyFeePayerSignatureResult}`);
+
+			let recoverTx = web3.Transaction.populate(web3.Message.from(realDataNeedToSign), [
+				bs58.encode(feePayerSignature),
+				bs58.encode(sourceSignature),
+			]);
+			console.log('recoverTx', recoverTx);
+			console.log(recoverTx.serialize());
+
+			// 4. Send transaction
+			const connection = new web3.Connection(this.URLtoBroadcast);
+
+			console.log(recoverTx.serializeMessage());
 
 			this.IsCreated = true;
-			this.signedTx = '1asd5f45as1f5ewf1a81sf6daef51a9sf848aw94ef1as61dfa61ef89as1f91e8sf1as5df16asef8sef18';
+			this.signedTx = '';
+			this.signedTx = await connection.sendRawTransaction(recoverTx.serialize());
 
-			localStorage.setItem('SignedTx', this.signedTx);
+			console.log(`txhash: ${this.signedTx}`);
 		}
+	},
+	mounted() {
+		this.getSourceAddressFromMnemonic();
 	}
 };
 </script>
@@ -75,8 +127,8 @@ export default {
 			</div>
 			<FormInput label="Mnemonic" inputIdentifier="Mnemonic" :val="mnemonic" placeholder="Type the mnemonic"
 				@input="event => setMnemonic(event)" />
-			<FormInput label="Source Address" inputIdentifier="Source Address" :val="sourceAddress"
-				placeholder="Type the mnemonic" />
+			<FormInput label="Source Address" inputIdentifier="Source Address"
+				:val="sourceAddress != null ? sourceAddress.publicKey : ''" placeholder="Type the Source Address" />
 			<FormInput label="URL to broadcast" inputIdentifier="URL to broadcast" :val="URLtoBroadcast" />
 
 			<div class="flex justify-center my-4">

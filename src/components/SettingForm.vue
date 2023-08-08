@@ -45,11 +45,7 @@ export default {
 			// Add web3
 			const connection = new web3.Connection(this.endpointUrl);
 
-			// console.log(connection);
-
 			connection.getRecentBlockhash().then((recentBlockhash) => {
-				console.log(recentBlockhash);
-
 				this.IsRequested = true;
 				this.recentBlockhash = recentBlockhash.blockhash;
 				localStorage.setItem('RecentBlockhash', this.recentBlockhash);

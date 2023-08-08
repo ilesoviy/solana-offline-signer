@@ -1,6 +1,5 @@
 <script>
 import ThemeSwitcher from '../ThemeSwitcher';
-import feather from 'feather-icons';
 import AppHeaderLinks from './AppHeaderLinks.vue';
 
 export default {
@@ -20,16 +19,12 @@ export default {
 		this.theme = localStorage.getItem('theme') || 'light';
 	},
 	mounted() {
-		feather.replace();
 		this.theme = localStorage.getItem('theme') || 'light';
 	},
 	methods: {
 		updateTheme(theme) {
 			this.theme = theme;
 		},
-	},
-	updated() {
-		feather.replace();
 	},
 };
 </script>
