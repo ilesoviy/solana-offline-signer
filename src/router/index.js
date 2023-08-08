@@ -5,7 +5,7 @@ const routes = [
 		path: '/',
 		name: 'Create Signed Transaction Offline',
 		component: () =>
-			import(/* webpackChunkName: "projects" */ '../views/CreateTx.vue'),
+			import('../views/CreateTx.vue'),
 		meta: {
 			title: 'Solana | Create Signed Transaction Offline',
 		},
@@ -13,11 +13,8 @@ const routes = [
 	{
 		path: '/broadcast',
 		name: 'Broadcast',
-		// route level code-splitting
-		// this generates a separate chunk (about.[hash].js) for this route
-		// which is lazy-loaded when the route is visited.
 		component: () =>
-			import(/* webpackChunkName: "about" */ '../views/Broadcast.vue'),
+			import('../views/Broadcast.vue'),
 		meta: {
 			title: 'Solana | Broadcast',
 		},
@@ -26,9 +23,18 @@ const routes = [
 		path: '/settings',
 		name: 'Settings',
 		component: () =>
-			import(/* webpackChunkName: "projects" */ '../views/Settings.vue'),
+			import('../views/Settings.vue'),
 		meta: {
-			title: 'Stoman - Settings',
+			title: 'Solana | Settings',
+		},
+	},
+	{
+		path: '/nonce',
+		name: 'Create Nonce Account',
+		component: () =>
+			import('../views/NonceAccount.vue'),
+		meta: {
+			title: 'Solana | Create Nonce Account',
 		},
 	},
 ];

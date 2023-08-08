@@ -4,6 +4,8 @@ import FormInput from './reusable/FormInput.vue';
 import FormTextarea from './reusable/FormTextarea.vue';
 import QrcodeVue from 'qrcode.vue';
 
+import * as web3 from '@solana/web3.js';
+
 export default {
 	components: {
 		Button,
@@ -22,26 +24,21 @@ export default {
 		}
 	},
 	methods: {
-		setSignedTransaction(event) {
-			this.signedTx = event.target.value;
-
-			localStorage.setItem('SignedTx', this.signedTx);
-		},
-		setDestinationAddress(event) {
-			this.destinationAddress = event.target.value;
-
-			localStorage.setItem('DestinationAddress', this.destinationAddress);
-		},
-		setAmount(event) {
-			this.amount = event.target.value;
-
-			localStorage.setItem('Amount', this.amount);
-		},
-		broadcast() {
+		async broadcast() {
 			// Add web3
+			const connection = new web3.Connection(this.URLtoBroadcast);
 
-			this.IsBroadcasted = true;
-			this.broadcastAction = 'jsonrpc:';
+			// Send Transaction
+			try {
+				const txhash = await connection.sendRawTransaction(Buffer.from(this.signedTx, 'base64'));
+
+				console.log(txhash);
+
+				this.IsBroadcasted = true;
+				this.broadcastAction = txhash;
+			} catch (e) {
+				console.log(e);
+			}
 		}
 	}
 };
@@ -50,12 +47,10 @@ export default {
 <template>
 	<div class="w-full">
 		<div class="leading-loose p-7 bg-secondary-light dark:bg-secondary-dark rounded-xl shadow-xl text-left">
-			<FormTextarea label="Signed Transaction" textareaIdentifier="Signed Transaction" :value="signedTx"
-				@input="event => setSignedTransaction(event)" />
+			<FormTextarea label="Signed Transaction" textareaIdentifier="Signed Transaction" :value="signedTx" readonly />
 			<FormInput label="Destination Address" inputIdentifier="Destination Address" :val="destinationAddress"
-				placeholder="Unknown" @input="event => setDestinationAddress(event)" />
-			<FormInput label="Amount (Lamports)" inputIdentifier="" :val="amount" placeholder="Type the amount"
-				@input="event => setAmount(event)" />
+				placeholder="Unknown" readonly />
+			<FormInput label="Amount (Lamports)" inputIdentifier="" :val="amount" placeholder="Type the amount" readonly />
 			<div class="text-white flex justify-end mr-2">
 				{{ amount / (10 ** 9) }} SOL
 			</div>
