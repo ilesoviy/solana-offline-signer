@@ -17,13 +17,13 @@ export default {
 			nodes: [
 				{
 					url: 'https://api.devnet.solana.com'	// testnet
-				}, 
+				},
 				{
 					url: 'https://api.mainnet-beta.solana.com'	// mainnet
-				}, 
+				},
 				{
 					url: 'https://api.metaplex.solana.com'	// other public url of mainnet
-				}, 
+				},
 				// {
 				// 	url: 'https://solana-devnet.g.alchemy.com/v2/iq-vSBJDLt7-8Gphy_NqUHShzguFb5Kz'	// devnet url from Alchemy
 				// },
@@ -43,13 +43,19 @@ export default {
 		},
 		async getRecentBlockhash() {
 			// Add web3
-			const connection = new web3.Connection(this.endpointUrl);
+			try {
+				const connection = new web3.Connection(this.endpointUrl);
 
-			connection.getRecentBlockhash().then((recentBlockhash) => {
-				this.IsRequested = true;
-				this.recentBlockhash = recentBlockhash.blockhash;
-				localStorage.setItem('RecentBlockhash', this.recentBlockhash);
-			});
+				connection.getRecentBlockhash().then((recentBlockhash) => {
+					this.IsRequested = true;
+					this.recentBlockhash = recentBlockhash.blockhash;
+					localStorage.setItem('RecentBlockhash', this.recentBlockhash);
+				}).catch(e => {
+					console.log(e);
+				});
+			} catch (e) {
+				console.log(e);
+			}
 		}
 	},
 };

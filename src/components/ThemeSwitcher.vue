@@ -14,7 +14,7 @@ export default {
 			this.$emit('theme-changed', newTheme);
 			this.$router.go();
 		},
-	},
+	}
 };
 </script>
 

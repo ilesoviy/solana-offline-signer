@@ -16,10 +16,10 @@ export default {
 	},
 
 	created() {
-		this.theme = localStorage.getItem('theme') || 'light';
+		this.theme = 'dark';
 	},
 	mounted() {
-		this.theme = localStorage.getItem('theme') || 'light';
+		this.theme = 'dark';
 	},
 	methods: {
 		updateTheme(theme) {
