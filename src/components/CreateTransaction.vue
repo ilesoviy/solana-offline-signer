@@ -151,6 +151,18 @@ export default {
 			} catch (e) {
 				console.log(e);
 			}
+		},
+		onFileChange(event) {
+			const file = event.target.files[0];
+			if (file) {
+				const reader = new FileReader()
+				reader.onload = () => {
+					this.mnemonic = reader.result;
+
+					this.getSourceAddressFromMnemonic();
+				}
+				reader.readAsText(file)
+			}
 		}
 	},
 	mounted() {
@@ -183,8 +195,14 @@ export default {
 			<div class="text-white flex justify-end mr-2">
 				{{ amount / (10 ** 9) }} SOL
 			</div>
-			<FormInput label="Mnemonic" inputIdentifier="Mnemonic" :val="mnemonic" placeholder="Type the mnemonic"
-				@input="event => setMnemonic(event)" />
+			<div>
+				<label class="block mb-2 text-lg text-primary-dark dark:text-primary-light">Mnemonic</label>
+				<input
+					class="text-white border border-gray-300 dark:border-primary-dark border-opacity-50 text-primary-dark dark:text-secondary-light bg-ternary-light dark:bg-ternary-dark rounded-md shadow-sm"
+					type="file" @change="onFileChange" ref="file">
+			</div>
+			<!-- <FormInput label="Mnemonic" inputIdentifier="Mnemonic" :val="mnemonic" placeholder="Type the mnemonic"
+				@input="event => setMnemonic(event)" /> -->
 			<FormInput label="Source Address" inputIdentifier="Source Address"
 				:val="sourceAddress != null ? sourceAddress.publicKey : ''" placeholder="Type the Source Address" />
 			<FormInput label="URL to broadcast" inputIdentifier="URL to broadcast" :val="URLtoBroadcast" />
