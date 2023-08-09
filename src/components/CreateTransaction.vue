@@ -3,9 +3,6 @@ import Button from './reusable/Button.vue';
 import FormInput from './reusable/FormInput.vue';
 import QrcodeVue from 'qrcode.vue';
 
-import 'core-js/stable';
-import 'regenerator-runtime/runtime';
-
 import * as web3 from '@solana/web3.js';
 
 import nacl from 'tweetnacl';
