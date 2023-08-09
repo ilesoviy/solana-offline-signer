@@ -24,12 +24,27 @@ export default {
 		}
 	},
 	methods: {
+		proc() {
+			try {
+				const rawTx = Buffer.from(this.signedTx, 'base64');
+
+				const rawTransaction = web3.Transaction.from(rawTx);
+
+				let msg = rawTransaction.compileMessage();
+
+				this.destinationAddress = msg.accountKeys[2].toBase58();
+
+				const msg2 = rawTransaction.serializeMessage();
+				this.amount = msg2.readInt32LE(174);
+			} catch (e) {
+				this.destinationAddress = '';
+				this.amount = '';
+				console.log(e);
+			}
+		},
 		setSignedTx(event) {
 			this.signedTx = event.target.value;
-
-			const rawTx = Buffer.from(this.signedTx, 'base64');
-
-			console.log(rawTx);
+			this.proc();
 		},
 		async broadcast() {
 			// Add web3
@@ -47,6 +62,9 @@ export default {
 				console.log(e);
 			}
 		}
+	},
+	mounted() {
+		this.proc();
 	}
 };
 </script>
@@ -55,7 +73,7 @@ export default {
 	<div class="w-full">
 		<div class="leading-loose p-7 bg-secondary-light dark:bg-secondary-dark rounded-xl shadow-xl text-left">
 			<FormTextarea label="Signed Transaction" textareaIdentifier="Signed Transaction" :value="signedTx"
-				@input="event => setSignedTx(event)" readonly />
+				@input="event => setSignedTx(event)" />
 			<FormInput label="Destination Address" inputIdentifier="Destination Address" :val="destinationAddress"
 				placeholder="Unknown" readonly />
 			<FormInput label="Amount (Lamports)" inputIdentifier="" :val="amount" placeholder="Type the amount" readonly />
