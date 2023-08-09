@@ -2,14 +2,9 @@
 import Button from './reusable/Button.vue';
 import FormInput from './reusable/FormInput.vue';
 import QrcodeVue from 'qrcode.vue';
-
 import * as web3 from '@solana/web3.js';
-
 import * as bip39 from 'bip39';
-import * as bs58 from "bs58";
 import { derivePath } from 'ed25519-hd-key';
-
-import { toast } from 'vue3-toastify';
 import 'vue3-toastify/dist/index.css';
 
 export default {
@@ -20,142 +15,76 @@ export default {
 	},
 	data: () => {
 		return {
-			URLtoBroadcast: localStorage.getItem('EndPointUrl') == undefined ? '' : localStorage.getItem('EndPointUrl'),
-			IsRequested: false,
-			nonceAccount: null,
+			recentBlockhash: localStorage.getItem('RecentBlockhash') == undefined ? '' : localStorage.getItem('RecentBlockhash'),
+			minFeeExemptAmount: localStorage.getItem('MinFeeExemptAmount') == undefined ? 1500000 : localStorage.getItem('MinFeeExemptAmount'),
 			destinationAddress: localStorage.getItem('DestinationAddress') == undefined ? '' : localStorage.getItem('DestinationAddress'),
-			amount: localStorage.getItem('Amount') == undefined ? '' : localStorage.getItem('Amount'),
-			mnemonic: '',
-			sourceAddress: null,
-			IsCreated: false,
+			mnemonic: null, //Seed for the account creating the nonce account
+			nonceMnemonic: null, //Seed for the nonce account
+			sourceAccount: null,
+			nonceAccount: null,
 			signedTx: '',
-			nonceAccountPublicKey: '',
-			nonceAccountAuthSecretKey: '',
+			nonceAccountDerivationPath: "m/44'/501'/0'/2'",
 		}
 	},
 	methods: {
-		setNonceAccount(event) {
-			this.nonceAccountPublicKey = event.target.value;
-		},
-		setDestinationAddress(event) {
-			this.destinationAddress = event.target.value;
-
-			localStorage.setItem('DestinationAddress', this.destinationAddress);
+		setRecentBlockhash(event) {
+			this.recentBlockhash = event.target.value;
 		},
 		setAmount(event) {
-			this.amount = event.target.value;
-
-			localStorage.setItem('Amount', this.amount);
+			this.minFeeExemptAmount = event.target.value;
+			localStorage.setItem('MinFeeExemptAmount', this.minFeeExemptAmount);
 		},
 		async getSourceAddressFromMnemonic() {
-			// Add web3
 			try {
 				const seed = bip39.mnemonicToSeedSync(this.mnemonic, "");
-				const path = `m/44'/501'/0'/0'`;
-				const keypair = web3.Keypair.fromSeed(derivePath(path, seed.toString("hex")).key);
+				const keypair = web3.Keypair.fromSeed(Uint8Array.from(seed.slice(0, 32)));
+				this.sourceAccount = keypair;
+			} catch (e) {
+				console.log(e);
+			}
+		},
+		async getNonceAddressFromMnemonic() {
+			try {
+				if(!this.nonceMnemonic){
+					return; //We should not generate unless there is a selected seed/mnemonic file, otherwise may accidentally loose private key 
+				}
+				const seed = bip39.mnemonicToSeedSync(this.nonceMnemonic, "");
+				const keypair = web3.Keypair.fromSeed(derivePath(this.nonceAccountDerivationPath, seed.toString("hex")).key);
+				this.nonceAccount = keypair;
 
-				this.sourceAddress = keypair;
+				localStorage.setItem('NonceAccountAddress', this.nonceAccount.publicKey);
 			} catch (e) {
 				console.log(e);
 			}
 		},
 		async createNonceAccount() {
-			// Add web3
 			try {
-				const connection = new web3.Connection(this.URLtoBroadcast);
-
-				const feePayer = this.sourceAddress;
-
-				const nonceAccountAuth = this.sourceAddress;
-
-				this.nonceAccount = web3.Keypair.generate();
 				console.log(`nonce account: ${this.nonceAccount.publicKey.toBase58()}`);
+				console.log(`source account: ${this.sourceAccount.publicKey.toBase58()}`);
 
 				let tx = new web3.Transaction().add(
 					// create nonce account
 					web3.SystemProgram.createAccount({
-						fromPubkey: feePayer.publicKey,
+						fromPubkey: this.sourceAccount.publicKey,
 						newAccountPubkey: this.nonceAccount.publicKey,
-						lamports: await connection.getMinimumBalanceForRentExemption(
-							web3.NONCE_ACCOUNT_LENGTH
-						),
+						lamports: this.minFeeExemptAmount,
 						space: web3.NONCE_ACCOUNT_LENGTH,
 						programId: web3.SystemProgram.programId,
 					}),
 					// init nonce account
 					web3.SystemProgram.nonceInitialize({
 						noncePubkey: this.nonceAccount.publicKey, // nonce account pubkey
-						authorizedPubkey: nonceAccountAuth.publicKey, // nonce account authority (for advance and close)
+						authorizedPubkey: this.sourceAccount.publicKey, // nonce account authority (for advance and close)
 					})
 				);
+				tx.recentBlockhash = this.recentBlockhash;
+				tx.feePayer = this.sourceAccount.publicKey;
 
-				console.log(
-					`txhash: ${await connection.sendTransaction(tx, [feePayer, this.nonceAccount])}`
-				);
+				// sign the transaction with both the nonce keypair and the authority keypair
+				tx.sign(this.nonceAccount, this.sourceAccount);
 
-				// Save Info
-				this.IsRequested = true;
-
-				this.nonceAccountPublicKey = this.nonceAccount.publicKey.toBase58();
-				this.nonceAccountAuthSecretKey = bs58.encode(nonceAccountAuth.secretKey);
-			} catch (e) {
-				console.log(e);
-			}
-		},
-		async createTransaction() {
-			// Add web3
-			try {
-				const feePayer = this.sourceAddress;
-
-				console.log(this.nonceAccountAuthSecretKey);
-
-				const nonceAccountAuth = web3.Keypair.fromSecretKey(
-					bs58.decode(
-						this.nonceAccountAuthSecretKey
-					)
-				);
-
-				const connection = new web3.Connection(this.URLtoBroadcast);
-
-				console.log(this.nonceAccountPublicKey);
-				const nonceAccountPubkey = new web3.PublicKey(
-					this.nonceAccountPublicKey
-				);
-				console.log(nonceAccountPubkey);
-				let nonceAccountInfo = await connection.getAccountInfo(nonceAccountPubkey);
-				console.log(nonceAccountInfo);
-				if (nonceAccountInfo != null) {
-					let nonceAccount = web3.NonceAccount.fromAccountData(nonceAccountInfo.data);
-
-					let tx = new web3.Transaction().add(
-						// nonce advance must be the first insturction
-						web3.SystemProgram.nonceAdvance({
-							noncePubkey: nonceAccountPubkey,
-							authorizedPubkey: nonceAccountAuth.publicKey,
-						}),
-						// after that, you do what you really want to do, here we append a transfer instruction as an example.
-						web3.SystemProgram.transfer({
-							fromPubkey: feePayer.publicKey,
-							toPubkey: nonceAccountAuth.publicKey,
-							lamports: this.amount,
-						})
-					);
-					// assign `nonce` as recentBlockhash
-					tx.recentBlockhash = nonceAccount.nonce;
-					tx.feePayer = feePayer.publicKey;
-					tx.sign(
-						feePayer,
-						nonceAccountAuth
-					); /* fee payer + nonce account authority + ... */
-
-					// Convert to base64 code
-					this.IsCreated = true;
-					this.signedTx = tx.serialize().toString('base64');
-
-					localStorage.setItem('SignedTx', this.signedTx);
-				} else {
-					toast.warning('Nonce Account was not created yet.');
-				}
+				this.signedTx = tx.serialize().toString('base64');
+				localStorage.setItem('SignedTx', this.signedTx);
 			} catch (e) {
 				console.log(e);
 			}
@@ -166,11 +95,31 @@ export default {
 				const reader = new FileReader()
 				reader.onload = () => {
 					this.mnemonic = reader.result;
-
 					this.getSourceAddressFromMnemonic();
 				}
 				reader.readAsText(file)
+			}else {
+				console.log('No File Selecrted')
 			}
+		},
+		onNonceFileChange(event) {
+			const file = event.target.files[0];
+			if (file) {
+				const reader = new FileReader()
+				reader.onload = () => {
+					this.nonceMnemonic = reader.result;
+					this.getNonceAddressFromMnemonic();
+				}
+				reader.readAsText(file)
+			} else {
+				console.log('No File Selecrted')
+			}
+
+		},
+		setDerivationPath(value) {
+			this.nonceAccountDerivationPath = value;
+			console.log('new Derivation Path: ' + value);
+			this.getNonceAddressFromMnemonic();
 		}
 	},
 };
@@ -179,60 +128,58 @@ export default {
 <template>
 	<div class="w-full">
 		<div class="leading-loose p-7 bg-secondary-light dark:bg-secondary-dark rounded-xl shadow-xl text-left">
+
+			<FormInput label="Recent Blockhash" inputIdentifier="Recent Blockhash" placeholder="Recent Blockhash"
+				:val="recentBlockhash" @input="setRecentBlockhash" />
+
+			<FormInput label="Amount to seen Nonce account with (Lamports)" inputIdentifier="" :val="minFeeExemptAmount" placeholder="Type the amount"
+				@input="event => setAmount(event)" />
+			<div class="text-white flex justify-end mr-2">
+				{{ minFeeExemptAmount / (10 ** 9) }} SOL
+			</div>
+
 			<div>
-				<label class="block mb-2 text-lg text-primary-dark dark:text-primary-light">Mnemonic</label>
+				<label class="block mb-2 text-lg text-primary-dark dark:text-primary-light">Mnemonic/Seed (Nonce
+					Authority)</label>
 				<input
 					class="text-white border border-gray-300 dark:border-primary-dark border-opacity-50 text-primary-dark dark:text-secondary-light bg-ternary-light dark:bg-ternary-dark rounded-md shadow-sm"
 					type="file" @change="onFileChange" ref="file">
 			</div>
 			<FormInput label="Source Address" inputIdentifier="Source Address"
-				:val="sourceAddress != null ? sourceAddress.publicKey : ''" placeholder="Type the Source Address" />
+				:val="sourceAccount != null ? sourceAccount.publicKey : ''" placeholder="Type the Source Address" />
 
-			<FormInput label="URL to broadcast" inputIdentifier="URL to broadcast" :val="URLtoBroadcast" readonly />
+			<!-- New nonce Account Seed-->
+			<div class="mt-10">
+				<label class="block mb-2 text-lg text-primary-dark dark:text-primary-light">Mnemonic/Seed (New Nonce
+					Account)</label>
+				<input
+					class="text-white border border-gray-300 dark:border-primary-dark border-opacity-50 text-primary-dark dark:text-secondary-light bg-ternary-light dark:bg-ternary-dark rounded-md shadow-sm"
+					type="file" @change="onNonceFileChange" ref="file">
+			</div>
+			<!-- New Nonce Seed Address Derivation Path-->
+			<label class="block mb-2 text-lg text-primary-dark dark:text-primary-light">New Nonce Seed - Address Derivation
+				Path</label>
+			<FormInput label="Nonce Account Derivation Path" inputIdentifier="Nonce Account Derivation Path"
+				:val="nonceAccountDerivationPath" placeholder="m/44'/501'/0'/2'" @input="event => setDerivationPath(event.target.value)" />
+			<FormInput label="Nonce Address" inputIdentifier="Nonce Address"
+				:val="nonceAccount != null ? nonceAccount.publicKey : ''" placeholder="Nonce Address" />
+
 
 			<div class="flex justify-center my-4">
-				<Button title="Create Nonce Account"
+				<Button title="Create Nonce Account Transaction"
 					class="px-4 py-2.5 text-white tracking-wider bg-indigo-500 hover:bg-indigo-600 focus:ring-1 focus:ring-indigo-900 rounded-lg duration-500"
 					type="button" aria-label="Create Nonce Account" @click="createNonceAccount" />
 			</div>
 
-			<div class="text-white">
-				<div v-if="IsRequested == true">
-					<FormInput label="Nonce Account" inputIdentifier="Nonce Account" :val="nonceAccountPublicKey"
-						placeholder="Type the Nonce Account" @input="event => setNonceAccount(event)" />
-
-					<FormInput label="Destination Address" inputIdentifier="Destination Address" :val="destinationAddress"
-						placeholder="Unknown" @input="event => setDestinationAddress(event)" />
-					<FormInput label="Amount (Lamports)" inputIdentifier="" :val="amount" placeholder="Type the amount"
-						@input="event => setAmount(event)" />
-					<div class="text-white flex justify-end mr-2">
-						{{ amount / (10 ** 9) }} SOL
-					</div>
-
-					<div class="flex justify-center my-4">
-						<Button title="Create Transaction"
-							class="px-4 py-2.5 text-white tracking-wider bg-indigo-500 hover:bg-indigo-600 focus:ring-1 focus:ring-indigo-900 rounded-lg duration-500"
-							type="button" aria-label="Get Recent Blockhash" @click="createTransaction" />
-					</div>
-
-					<div class="text-white" v-if="IsCreated == true">
-						<div style="border-bottom: 1px dotted gray"></div>
-						<div class="text-white text-lg mt-2">
-							<h1>Signed Transaction:</h1>
-						</div>
-
-						<div style="word-break: break-all;">
-							{{ signedTx }}
-						</div>
-						<div class="flex justify-center">
-							<qrcode-vue :value="signedTx" size="256"></qrcode-vue>
-						</div>
-					</div>
-				</div>
-				<div v-else>
-					Nonce Account: None
-				</div>
+			<!-- Raw Transaction Output-->
+			<div style="word-break: break-all;" class="text-white">
+				{{ signedTx }}
 			</div>
+			<!-- QR Code for Create nonce TX-->
+			<div class="flex justify-center">
+				<qrcode-vue :value="signedTx" size="256"></qrcode-vue>
+			</div>
+
 		</div>
 	</div>
 </template>

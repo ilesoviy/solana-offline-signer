@@ -19,27 +19,25 @@ export default {
 			destinationAddress: localStorage.getItem('DestinationAddress') == undefined ? '' : localStorage.getItem('DestinationAddress'),
 			amount: localStorage.getItem('Amount') == undefined ? '' : localStorage.getItem('Amount'),
 			URLtoBroadcast: localStorage.getItem('EndPointUrl') == undefined ? '' : localStorage.getItem('EndPointUrl'),
-			IsBroadcasted: false,
 			broadcastAction: '',
 		}
 	},
 	methods: {
 		proc() {
 			try {
-				const rawTx = Buffer.from(this.signedTx, 'base64');
-
-				const rawTransaction = web3.Transaction.from(rawTx);
-
-				let msg = rawTransaction.compileMessage();
-
-				this.destinationAddress = msg.accountKeys[1].toBase58();
-
-				const msg2 = rawTransaction.serializeMessage();
-				if (msg.accountKeys.length == 3) {
-					this.amount = msg2.readInt32LE(142);
-				} else {
-					this.amount = msg2.readInt32LE(184);
-				}
+				const rawTransaction = web3.Transaction.from(Buffer.from(this.signedTx, 'base64'));
+				console.log(rawTransaction);
+				rawTransaction.instructions.forEach((instruction) => {
+					if (instruction.programId.equals(web3.SystemProgram.programId)) {
+						const systemInstruction = web3.SystemInstruction.decodeInstructionType(instruction);
+						console.log('System Instruction:', systemInstruction);
+						if (systemInstruction == 'Transfer'){
+							const t = web3.SystemInstruction.decodeTransfer(instruction)
+							this.destinationAddress = t.toPubkey.toBase58();
+							this.amount = ''+  t.lamports;
+						}
+					}
+				});
 			} catch (e) {
 				this.destinationAddress = '';
 				this.amount = '';
@@ -51,19 +49,17 @@ export default {
 			this.proc();
 		},
 		async broadcast() {
-			// Add web3
 			const connection = new web3.Connection(this.URLtoBroadcast);
 
 			// Send Transaction
 			try {
-				const txhash = await connection.sendRawTransaction(Buffer.from(this.signedTx, 'base64'));
+				const response = await connection.sendRawTransaction(Buffer.from(this.signedTx, 'base64'));
 
-				console.log(txhash);
-
-				this.IsBroadcasted = true;
-				this.broadcastAction = txhash;
+				console.log(response);
+				this.broadcastAction = response;
 			} catch (e) {
 				console.log(e);
+				this.broadcastAction = e;
 			}
 		}
 	},
@@ -101,11 +97,8 @@ export default {
 				<h1>Recent Broadcasted Transactions:</h1>
 			</div>
 
-			<div class="text-white" v-if="IsBroadcasted == true">
+			<div class="text-white">
 				{{ broadcastAction }}
-			</div>
-			<div class="text-white" v-else>
-				No recent broadcasted transactions found.
 			</div>
 		</div>
 	</div>
