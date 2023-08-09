@@ -21,15 +21,10 @@ export default {
 	},
 	data: () => {
 		return {
-			picked: '1',
 			recentBlockhash: localStorage.getItem('RecentBlockhash') == undefined ? '' : localStorage.getItem('RecentBlockhash'),
-			nonceAccountPublicKey: localStorage.getItem('NonceAccount-PublicKey') == undefined ? '' : localStorage.getItem('NonceAccount-PublicKey'),
-			nonceAccountSecretKey: localStorage.getItem('NonceAccount-SecretKey') == undefined ? '' : localStorage.getItem('NonceAccount-SecretKey'),
-			nonceAccountAuthPublicKey: localStorage.getItem('NonceAccountAuth-PublicKey') == undefined ? '' : localStorage.getItem('NonceAccountAuth-PublicKey'),
-			nonceAccountAuthSecretKey: localStorage.getItem('NonceAccountAuth-SecretKey') == undefined ? '' : localStorage.getItem('NonceAccountAuth-SecretKey'),
 			destinationAddress: localStorage.getItem('DestinationAddress') == undefined ? '' : localStorage.getItem('DestinationAddress'),
 			amount: localStorage.getItem('Amount') == undefined ? '' : localStorage.getItem('Amount'),
-			mnemonic: 'another claw veteran ancient early manual tip eternal horn stereo hole apple',
+			mnemonic: '',
 			sourceAddress: null,
 			URLtoBroadcast: localStorage.getItem('EndPointUrl') == undefined ? '' : localStorage.getItem('EndPointUrl'),
 			IsCreated: false,
@@ -37,6 +32,11 @@ export default {
 		}
 	},
 	methods: {
+		setRecentBlockhash(event) {
+			this.recentBlockhash = event.target.value;
+
+			localStorage.setItem('RecentBlockhash', this.recentBlockhash);
+		},
 		setDestinationAddress(event) {
 			this.destinationAddress = event.target.value;
 
@@ -46,11 +46,6 @@ export default {
 			this.amount = event.target.value;
 
 			localStorage.setItem('Amount', this.amount);
-		},
-		setMnemonic(event) {
-			this.mnemonic = event.target.value;
-
-			this.getSourceAddressFromMnemonic();
 		},
 		async getSourceAddressFromMnemonic() {
 			// Add web3
@@ -69,85 +64,40 @@ export default {
 			try {
 				const feePayer = web3.Keypair.generate();
 
-				if (this.picked == '1') {
-					// 1. Create Transaction
-					let tx = new web3.Transaction().add(
-						web3.SystemProgram.transfer({
-							fromPubkey: this.sourceAddress.publicKey,
-							toPubkey: new web3.PublicKey(this.destinationAddress),
-							lamports: this.amount,
-						})
-					);
-					tx.recentBlockhash = this.recentBlockhash;
-					tx.feePayer = feePayer.publicKey;
-					let realDataNeedToSign = tx.serializeMessage(); // the real data singer need to sign.
+				// 1. Create Transaction
+				let tx = new web3.Transaction().add(
+					web3.SystemProgram.transfer({
+						fromPubkey: this.sourceAddress.publicKey,
+						toPubkey: new web3.PublicKey(this.destinationAddress),
+						lamports: this.amount,
+					})
+				);
+				tx.recentBlockhash = this.recentBlockhash;
+				tx.feePayer = feePayer.publicKey;
+				let realDataNeedToSign = tx.serializeMessage(); // the real data singer need to sign.
 
-					// 2. Sign Transaction
-					let feePayerSignature = nacl.sign.detached(realDataNeedToSign, feePayer.secretKey);
-					let sourceSignature = nacl.sign.detached(realDataNeedToSign, this.sourceAddress.secretKey);
+				// 2. Sign Transaction
+				let feePayerSignature = nacl.sign.detached(realDataNeedToSign, feePayer.secretKey);
+				let sourceSignature = nacl.sign.detached(realDataNeedToSign, this.sourceAddress.secretKey);
 
-					// 3. Recover Transaction
-					let verifyFeePayerSignatureResult = nacl.sign.detached.verify(
-						realDataNeedToSign,
-						feePayerSignature,
-						feePayer.publicKey.toBytes() // you should use the raw pubkey (32 bytes) to verify
-					);
-					console.log(`verify feePayer signature: ${verifyFeePayerSignatureResult}`);
+				// 3. Recover Transaction
+				let verifyFeePayerSignatureResult = nacl.sign.detached.verify(
+					realDataNeedToSign,
+					feePayerSignature,
+					feePayer.publicKey.toBytes() // you should use the raw pubkey (32 bytes) to verify
+				);
+				console.log(`verify feePayer signature: ${verifyFeePayerSignatureResult}`);
 
-					let recoverTx = web3.Transaction.populate(web3.Message.from(realDataNeedToSign), [
-						bs58.encode(feePayerSignature),
-						bs58.encode(sourceSignature),
-					]);
+				let recoverTx = web3.Transaction.populate(web3.Message.from(realDataNeedToSign), [
+					bs58.encode(feePayerSignature),
+					bs58.encode(sourceSignature),
+				]);
 
-					// 4. Convert to base64 code
-					this.IsCreated = true;
-					this.signedTx = recoverTx.serialize().toString('base64');
+				// 4. Convert to base64 code
+				this.IsCreated = true;
+				this.signedTx = recoverTx.serialize().toString('base64');
 
-					localStorage.setItem('SignedTx', this.signedTx);
-				} else {
-					console.log(this.nonceAccountAuthSecretKey);
-
-					const nonceAccountAuth = web3.Keypair.fromSecretKey(
-						bs58.decode(
-							this.nonceAccountAuthSecretKey
-						)
-					);
-
-					const connection = new web3.Connection(this.URLtoBroadcast);
-
-					const nonceAccountPubkey = new web3.PublicKey(
-						this.nonceAccountPublicKey
-					);
-					let nonceAccountInfo = await connection.getAccountInfo(nonceAccountPubkey);
-					let nonceAccount = web3.NonceAccount.fromAccountData(nonceAccountInfo.data);
-
-					let tx = new web3.Transaction().add(
-						// nonce advance must be the first insturction
-						web3.SystemProgram.nonceAdvance({
-							noncePubkey: nonceAccountPubkey,
-							authorizedPubkey: nonceAccountAuth.publicKey,
-						}),
-						// after that, you do what you really want to do, here we append a transfer instruction as an example.
-						web3.SystemProgram.transfer({
-							fromPubkey: feePayer.publicKey,
-							toPubkey: nonceAccountAuth.publicKey,
-							lamports: this.amount,
-						})
-					);
-					// assign `nonce` as recentBlockhash
-					tx.recentBlockhash = nonceAccount.nonce;
-					tx.feePayer = feePayer.publicKey;
-					tx.sign(
-						feePayer,
-						nonceAccountAuth
-					); /* fee payer + nonce account authority + ... */
-
-					// Convert to base64 code
-					this.IsCreated = true;
-					this.signedTx = tx.serialize().toString('base64');
-
-					localStorage.setItem('SignedTx', this.signedTx);
-				}
+				localStorage.setItem('SignedTx', this.signedTx);
 			} catch (e) {
 				console.log(e);
 			}
@@ -165,28 +115,14 @@ export default {
 			}
 		}
 	},
-	mounted() {
-		this.getSourceAddressFromMnemonic();
-	}
 };
 </script>
 
 <template>
 	<div class="w-full">
 		<div class="leading-loose p-7 bg-secondary-light dark:bg-secondary-dark rounded-xl shadow-xl text-left">
-			<div class="flex items-center justify-center">
-				<input v-model="picked" type="radio" name="check-1" value="1" />
-				<label class="ml-2 text-white" for="check-1">Recent Blockhash</label>
-
-				<input v-model="picked" type="radio" name="check-2" value="2" class="ml-8" />
-				<label class="ml-2 text-white" for="check-2">Nonce Account</label>
-			</div>
-
 			<FormInput label="Recent Blockhash" inputIdentifier="Recent Blockhash" :val="recentBlockhash"
-				placeholder="Unknown" readonly :hidden="picked != '1'" />
-
-			<FormInput label="Nonce Account" inputIdentifier="Nonce Account" :val="nonceAccountPublicKey"
-				placeholder="Unknown" readonly :hidden="picked != '2'" />
+				placeholder="Unknown" @input="event => setRecentBlockhash(event)" />
 
 			<FormInput label="Destination Address" inputIdentifier="Destination Address" :val="destinationAddress"
 				placeholder="Unknown" @input="event => setDestinationAddress(event)" />
@@ -201,8 +137,6 @@ export default {
 					class="text-white border border-gray-300 dark:border-primary-dark border-opacity-50 text-primary-dark dark:text-secondary-light bg-ternary-light dark:bg-ternary-dark rounded-md shadow-sm"
 					type="file" @change="onFileChange" ref="file">
 			</div>
-			<!-- <FormInput label="Mnemonic" inputIdentifier="Mnemonic" :val="mnemonic" placeholder="Type the mnemonic"
-				@input="event => setMnemonic(event)" /> -->
 			<FormInput label="Source Address" inputIdentifier="Source Address"
 				:val="sourceAddress != null ? sourceAddress.publicKey : ''" placeholder="Type the Source Address" />
 			<FormInput label="URL to broadcast" inputIdentifier="URL to broadcast" :val="URLtoBroadcast" />

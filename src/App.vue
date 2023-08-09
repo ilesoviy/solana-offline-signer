@@ -7,7 +7,7 @@ export default {
 	},
 	data: () => {
 		return {
-			appTheme: localStorage.getItem('theme'),
+			appTheme: 'dark',
 		};
 	},
 };

@@ -24,6 +24,13 @@ export default {
 		}
 	},
 	methods: {
+		setSignedTx(event) {
+			this.signedTx = event.target.value;
+
+			const rawTx = Buffer.from(this.signedTx, 'base64');
+
+			console.log(rawTx);
+		},
 		async broadcast() {
 			// Add web3
 			const connection = new web3.Connection(this.URLtoBroadcast);
@@ -47,7 +54,8 @@ export default {
 <template>
 	<div class="w-full">
 		<div class="leading-loose p-7 bg-secondary-light dark:bg-secondary-dark rounded-xl shadow-xl text-left">
-			<FormTextarea label="Signed Transaction" textareaIdentifier="Signed Transaction" :value="signedTx" readonly />
+			<FormTextarea label="Signed Transaction" textareaIdentifier="Signed Transaction" :value="signedTx"
+				@input="event => setSignedTx(event)" readonly />
 			<FormInput label="Destination Address" inputIdentifier="Destination Address" :val="destinationAddress"
 				placeholder="Unknown" readonly />
 			<FormInput label="Amount (Lamports)" inputIdentifier="" :val="amount" placeholder="Type the amount" readonly />
