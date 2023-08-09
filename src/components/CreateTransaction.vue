@@ -73,16 +73,8 @@ export default {
 				tx.feePayer = feePayer.publicKey;
 				let realDataNeedToSign = tx.serializeMessage(); // the real data singer need to sign.
 
-				console.log('fromPubkey', bs58.decode(this.sourceAddress.publicKey.toBase58()));
-				console.log('toPubkey', bs58.decode(new web3.PublicKey(this.destinationAddress).toBase58()));
-				console.log('fromPubkey', this.sourceAddress.publicKey);
-				console.log('toPubkey', new web3.PublicKey(this.destinationAddress));
-				console.log('lamports', this.amount);
-				console.log('realDataNeedToSign', realDataNeedToSign);
-
 				// 2. Sign Transaction
 				let feePayerSignature = nacl.sign.detached(realDataNeedToSign, feePayer.secretKey);
-				let sourceSignature = nacl.sign.detached(realDataNeedToSign, this.sourceAddress.secretKey);
 
 				// 3. Recover Transaction
 				let verifyFeePayerSignatureResult = nacl.sign.detached.verify(
@@ -94,14 +86,7 @@ export default {
 
 				let recoverTx = web3.Transaction.populate(web3.Message.from(realDataNeedToSign), [
 					bs58.encode(feePayerSignature),
-					bs58.encode(sourceSignature),
 				]);
-
-				console.log('realDataNeedToSign', realDataNeedToSign);
-				console.log('recoverTx', recoverTx);
-				console.log('recoverTx', recoverTx.serializeMessage());
-				console.log('recoverTx', recoverTx.serialize());
-				console.log('recoverTx', recoverTx.serialize().toString('base64'));
 
 				// 4. Convert to base64 code
 				this.IsCreated = true;

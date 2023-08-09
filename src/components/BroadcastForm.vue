@@ -32,10 +32,14 @@ export default {
 
 				let msg = rawTransaction.compileMessage();
 
-				this.destinationAddress = msg.accountKeys[2].toBase58();
+				this.destinationAddress = msg.accountKeys[1].toBase58();
 
 				const msg2 = rawTransaction.serializeMessage();
-				this.amount = msg2.readInt32LE(174);
+				if (msg.accountKeys.length == 3) {
+					this.amount = msg2.readInt32LE(142);
+				} else {
+					this.amount = msg2.readInt32LE(184);
+				}
 			} catch (e) {
 				this.destinationAddress = '';
 				this.amount = '';
