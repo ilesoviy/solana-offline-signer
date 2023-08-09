@@ -59,7 +59,7 @@ export default {
 		async createTransaction() {
 			// Add web3
 			try {
-				const feePayer = web3.Keypair.generate();
+				const feePayer = this.sourceAddress;
 
 				// 1. Create Transaction
 				let tx = new web3.Transaction().add(

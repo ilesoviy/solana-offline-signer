@@ -61,7 +61,7 @@ export default {
 
 				const NONCE_ACCOUNT_LENGTH = 44;
 
-				const feePayer = web3.Keypair.generate();
+				const feePayer = this.sourceAddress;
 
 				const nonceAccountAuth = web3.Keypair.generate();
 
@@ -102,7 +102,7 @@ export default {
 		async createTransaction() {
 			// Add web3
 			try {
-				const feePayer = web3.Keypair.generate();
+				const feePayer = this.sourceAddress;
 
 				console.log(this.nonceAccountAuthSecretKey);
 
