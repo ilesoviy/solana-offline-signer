@@ -17,7 +17,8 @@
     "qrcode.vue": "^3.4.1",
     "tweetnacl": "^1.0.3",
     "vue": "^3.2.45",
-    "vue-router": "^4.2.4"
+    "vue-router": "^4.2.4",
+    "vue3-toastify": "^0.1.12"
   },
   "devDependencies": {
     "@vue/cli-service": "~5.0.8",

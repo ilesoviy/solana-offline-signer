@@ -9,6 +9,9 @@ import * as bip39 from 'bip39';
 import * as bs58 from "bs58";
 import { derivePath } from 'ed25519-hd-key';
 
+import { toast } from 'vue3-toastify';
+import 'vue3-toastify/dist/index.css';
+
 export default {
 	components: {
 		Button,
@@ -150,6 +153,8 @@ export default {
 					this.signedTx = tx.serialize().toString('base64');
 
 					localStorage.setItem('SignedTx', this.signedTx);
+				} else {
+					toast.warning('Nonce Account was not created yet.');
 				}
 			} catch (e) {
 				console.log(e);
